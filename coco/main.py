@@ -42,13 +42,14 @@ def mAP(ann, pred, device):
 
 
 class COCODataset(torch.utils.data.Dataset):
-    def __init__(self, root, annpath):
+    def __init__(self, root, annpath, intix=False):
         self._cache = {}
         self.root = root
         self.masks = pd.read_json(annpath)
         self.imgs = np.sort(self.masks["id"].unique())
         self.lenc = LabelEncoder()
         self.masks["label"] = self.lenc.fit_transform(self.masks["label"])
+        self.intix = intix
 
     def get_mask(self, idx):
         df = self.masks[self.masks["id"] == idx][["label", "bbox"]]
@@ -137,7 +138,8 @@ class COCODataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # load images ad masks
-        idx = self.imgs[idx]
+        if self.intix:
+            idx = self.imgs[idx]
         if idx in self._cache:
             return self._cache[idx]
         img_path = op.join(self.root, f"{idx}".rjust(12, "0") + ".jpg")
@@ -168,11 +170,13 @@ class COCODataset(torch.utils.data.Dataset):
 
 if __name__ == "__main__":
     ds = COCODataset("data/train", "data/annotations.json")
-    bad_idx = [
-        411832, 44781, 518685, 455135, 323853, 246725, 30932, 114504, 107167, 37863,
-        246382, 1307, 456936, 558137, 416733, 1355, 221245, 281970, 311337, 81177
-    ]
-    model = torch.load("data/models/random.pt").eval().cpu()
+    # bad_idx = [
+    #     411832, 44781, 518685, 455135, 323853, 246725, 30932, 114504, 107167, 37863,
+    #     246382, 1307, 456936, 558137, 416733, 1355, 221245, 281970, 311337, 81177
+    # ]
+    bad_idx = [107167, 518685, 44781, 246725, 30932, 114504, 323853, 411832,
+               37863, 455135]
+    model = torch.load("data/models/strat.pt").eval().cpu()
     # ds.draw_bbox(221245, model)
     for idx in bad_idx:
         ds.draw_bbox(idx, model)
