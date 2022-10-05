@@ -87,10 +87,10 @@ class ChessDataset(torch.utils.data.Dataset):
             convert_image_dtype(img, torch.uint8),
             boxes=ann["boxes"],
             labels=labels_true,
-            colors="green",
-            width=2,
+            colors="#3cf205",
+            width=10,
             font="Ubuntu-R.ttf",
-            font_size=20,
+            font_size=30,
         )
         if model is not None:
             # Add predictions to the drawn model
@@ -103,14 +103,23 @@ class ChessDataset(torch.utils.data.Dataset):
                 boxes=pred["boxes"],
                 labels=labels_pred,
                 colors="red",
-                width=2,
+                width=10,
                 font="Ubuntu-R.ttf",
-                font_size=20,
+                font_size=50,
             )
-        plt.imshow(to_pil_image(drawn))
+        to_draw = to_pil_image(drawn)
+        if ax is None:
+            to_show = True
+            plt.imshow(to_draw)
+            ax = plt.gca()
+        else:
+            to_show = False
+            ax.imshow(to_draw)
         if title:
-            plt.title(f"{idx}")
-        plt.show()
+            ax.set_title(f"{idx}")
+        ax.set_axis_off()
+        if to_show:
+            plt.show()
 
     def plot_sample(self, nrows=2, ncols=2, annot=True, idx=None, **kwargs):
         if idx is None:
@@ -174,5 +183,12 @@ if __name__ == "__main__":
     root = op.join(op.dirname(__file__), "data/train")
     dataset = ChessDataset(root)
     model = torch.load("data/models/strat.pt").eval().cpu()
-    for idx in [36, 172, 38, 160, 121, 74, 15, 113, 138, 77, 194, 0, 1, 178, 97]:
-        dataset.draw_bbox(idx, model)
+    # bad_random_idx = [121, 113, 10, 187, 33, 75, 78, 47, 178, 53, 77, 0, 15, 160]
+    # for idx in bad_random_idx:
+    #     dataset.draw_bbox(idx, model)
+    bad_idx = [113, 178, 53, 160]
+    fig, ax = plt.subplots(nrows=2, ncols=2)
+    for idx, _ax in zip(bad_idx, ax.ravel()):
+        dataset.draw_bbox(idx, model=model, ax=_ax, title=False)
+    plt.tight_layout()
+    plt.show()

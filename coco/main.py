@@ -12,8 +12,63 @@ from torchvision.ops import box_iou
 from torchvision.utils import draw_bounding_boxes
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
+import math
+import sys
+import utils
 
 op = os.path
+
+
+def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=0):
+    model.train()
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    header = 'Epoch: [{}]'.format(epoch)
+
+    lr_scheduler = None
+    if epoch == 0:
+        warmup_factor = 1. / 1000
+        warmup_iters = min(1000, len(data_loader) - 1)
+
+        lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
+    LOSSES = []
+    if print_freq:
+        iterator = metric_logger.log_every(data_loader, print_freq, header)
+    else:
+        iterator = data_loader
+
+    for images, targets in iterator:
+        images = list(image.to(device) for image in images)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+        loss_dict = model(images, targets)
+        LOSSES.append(loss_dict)
+
+        losses = sum(loss for loss in loss_dict.values())
+
+        # reduce losses over all GPUs for logging purposes
+        loss_dict_reduced = utils.reduce_dict(loss_dict)
+        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+
+        loss_value = losses_reduced.item()
+
+        if not math.isfinite(loss_value):
+            print("Loss is {}, stopping training".format(loss_value))
+            print(loss_dict_reduced)
+            sys.exit(1)
+
+        optimizer.zero_grad()
+        losses.backward()
+        optimizer.step()
+
+        if lr_scheduler is not None:
+            lr_scheduler.step()
+
+        if print_freq:
+            metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
+            metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+
+    return LOSSES
 
 
 def mAP(ann, pred, device):
@@ -170,13 +225,15 @@ class COCODataset(torch.utils.data.Dataset):
 
 if __name__ == "__main__":
     ds = COCODataset("data/train", "data/annotations.json")
-    # bad_idx = [
-    #     411832, 44781, 518685, 455135, 323853, 246725, 30932, 114504, 107167, 37863,
-    #     246382, 1307, 456936, 558137, 416733, 1355, 221245, 281970, 311337, 81177
-    # ]
-    bad_idx = [107167, 518685, 44781, 246725, 30932, 114504, 323853, 411832,
-               37863, 455135]
-    model = torch.load("data/models/strat.pt").eval().cpu()
+    print(ds.lenc.classes_)
+    bad_idx = [
+        411832, 44781, 518685, 455135, 323853, 246725, 30932, 114504, 107167, 37863,
+        246382, 1307, 456936, 558137, 416733, 1355, 221245, 281970, 311337, 81177
+    ]
+    # bad_idx = [107167, 518685, 44781, 246725, 30932, 114504, 323853, 411832,
+    #            37863, 455135]
+    # bad_idx = [30932, 44781, 107167, 114504, 246725, 323853, 411832, 455135, 518685]
+    model = torch.load("data/models/random.pt").eval().cpu()
     # ds.draw_bbox(221245, model)
     for idx in bad_idx:
         ds.draw_bbox(idx, model)

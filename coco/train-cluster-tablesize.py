@@ -2,12 +2,11 @@
 # coding: utf-8
 
 import numpy as np
-from main import COCODataset, mAP
+from main import COCODataset, mAP, train_one_epoch
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.cluster import KMeans
 import os
 import torch
-from engine import train_one_epoch
 import torchvision as tv
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from tqdm import tqdm
